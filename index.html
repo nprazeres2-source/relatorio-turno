@@ -576,7 +576,7 @@ function buildSheet(r){
   ${sec("Ocorrências de serviço","#e0873a",`<div class="box">${ocs.length?ocs.map(o=>`<div class="oc"><b>${esc(o.hora)}</b><div class="pre" style="flex:1">${esc(o.desc)}</div></div>`).join(""):`<span class="mut">Sem ocorrências registadas.</span>`}</div>`)}
   ${sec("Mensagens","#e0873a",`<div class="box acc" style="--a:#e0873a">${txt(r.mensagens)}</div>`)}
   ${sec("Troca de turno","#6b7280",`<div class="cols">${sig(r.cessante,"Chefe cessante")}${sig(r.seguinte,"Chefe seguinte")}</div>`)}
-  ${sec("Visto do comandante","#1f2328",`<div class="cols">${sig({...r.comandante,obs:""},"Comandante")}<div class="box"><div class="k">Observações</div>${txt(r.comandante.obs)}</div></div>`)}
+  ${sec("Visto do Comandante","#1f2328",`<div class="cols">${sig({...r.comandante,obs:""},"Comandante")}<div class="box"><div class="k">Observações</div>${txt(r.comandante.obs)}</div></div>`)}
   <div class="foot">${r.fechado?"Relatório fechado em "+new Date(r.fechado).toLocaleString("pt-PT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})+" · ":"Relatório em aberto · "}Documento gerado em ${agora}</div>`;
 }
 $("#bPrint").onclick=()=>{ buildSheet(R); try{ window.print(); }catch(e){ toast("A impressão não está disponível aqui — use o PDF."); } };
