@@ -189,6 +189,7 @@ label.f{display:block;font-size:.82rem;color:var(--muted);margin-bottom:4px;font
       <button class="btn" id="bClose">Fechar relatório</button>
       <button class="btn" id="bPrint">Imprimir</button>
       <button class="btn pri" id="bPdf">PDF</button>
+      <button class="btn" id="bMail">Email</button>
       <button class="btn ghost" id="bDel" title="Apagar relatório">Apagar</button>
     </div>
     <div id="lockMsg" class="banner hide"></div>
@@ -242,7 +243,7 @@ label.f{display:block;font-size:.82rem;color:var(--muted);margin-bottom:4px;font
       </div>
     </div></div>
 
-    <div class="card"><h2>Visto comandante</h2><div class="in grid2">
+    <div class="card"><h2>Visto Comandante</h2><div class="in grid2">
       <div><label class="f">Nome</label><input type="text" data-k="comandante.nome"></div>
       <div><label class="f">Obs.</label><textarea data-k="comandante.obs" rows="2"></textarea></div>
     </div></div>
@@ -257,6 +258,7 @@ label.f{display:block;font-size:.82rem;color:var(--muted);margin-bottom:4px;font
       <div class="fieldblock"><label class="f">Comandante (preenchido nos novos relatórios)</label><input type="text" id="sCmd"></div>
       <div class="fieldblock"><label class="f">Turnos / piquetes (separados por vírgula)</label><input type="text" id="sTurnos"></div>
       <div class="fieldblock"><label class="f">Chefes (sugestões, separados por vírgula)</label><input type="text" id="sChefes"></div>
+      <div class="fieldblock"><label class="f">Email — destinatários habituais do relatório (separados por vírgula)</label><input type="text" id="sMail" inputmode="email" placeholder="ex.: comando@exemplo.pt"></div>
       <label class="row" style="gap:8px;margin-bottom:14px"><input type="checkbox" id="sCopy" style="width:auto"> Copiar automaticamente as mensagens do último relatório ao criar um novo</label>
       <button class="btn pri" id="bSaveSet">Guardar definições</button>
     </div></div>
@@ -300,7 +302,7 @@ function ask(msg, okTxt="Confirmar"){ return new Promise(res=>{
 
 /* ---------- armazenamento: db partilhada (sincroniza entre equipamentos) ou local ---------- */
 const DEF_SET = { assoc:"ASSOCIAÇÃO HUMANITÁRIA DE BOMBEIROS VOLUNTÁRIOS DO FAIAL", sub:"Corpo de Bombeiros",
-  comandante:"", turnos:"ALFA, BRAVO, CHARLIE, DELTA", chefes:"", copiarMsg:true };
+  comandante:"", emailPara:"", turnos:"ALFA, BRAVO, CHARLIE, DELTA", chefes:"", copiarMsg:true };
 let reports={}, settings={...DEF_SET};
 const LS = { get(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } },
              set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
@@ -537,12 +539,12 @@ $("#bDel").onclick=async()=>{ if(!(await ask("Apagar definitivamente o relatóri
 
 /* definições */
 $("#bSettings").onclick=()=>{ $("#sAssoc").value=settings.assoc; $("#sSub").value=settings.sub; $("#sCmd").value=settings.comandante;
-  $("#sTurnos").value=settings.turnos; $("#sChefes").value=settings.chefes; $("#sCopy").checked=!!settings.copiarMsg; const c=fbCfg(); $("#sFb").value=c&&!FIREBASE_CONFIG?JSON.stringify(c,null,1):""; updFbStatus(); show("vSet"); };
+  $("#sTurnos").value=settings.turnos; $("#sChefes").value=settings.chefes; $("#sCopy").checked=!!settings.copiarMsg; $("#sMail").value=settings.emailPara||""; const c=fbCfg(); $("#sFb").value=c&&!FIREBASE_CONFIG?JSON.stringify(c,null,1):""; updFbStatus(); show("vSet"); };
 $("#bSaveFb").onclick=()=>{ const c=parseCfg($("#sFb").value); if(!c) return toast("Configuração inválida — tem de ter apiKey e projectId.");
   LS.set("rt_fbcfg", c); toast("A ligar…"); setTimeout(()=>location.reload(),500); };
 $("#bClearFb").onclick=async()=>{ if(!(await ask("Desligar este equipamento do Firebase?","Desligar"))) return; try{ localStorage.removeItem("rt_fbcfg"); }catch(e){} location.reload(); };
 $("#bSaveSet").onclick=async()=>{ try{ await saveSettings({ assoc:$("#sAssoc").value, sub:$("#sSub").value, comandante:$("#sCmd").value,
-  turnos:$("#sTurnos").value, chefes:$("#sChefes").value, copiarMsg:$("#sCopy").checked }); toast("Definições guardadas"); show("vList"); }catch(e){ toast("Não foi possível guardar."); } };
+  turnos:$("#sTurnos").value, chefes:$("#sChefes").value, copiarMsg:$("#sCopy").checked, emailPara:$("#sMail").value.trim() }); toast("Definições guardadas"); show("vList"); }catch(e){ toast("Não foi possível guardar."); } };
 
 /* ---------- folha para impressão / PDF (réplica do documento) ---------- */
 function buildSheet(r){
@@ -576,7 +578,7 @@ function buildSheet(r){
   ${sec("Ocorrências de serviço","#e0873a",`<div class="box">${ocs.length?ocs.map(o=>`<div class="oc"><b>${esc(o.hora)}</b><div class="pre" style="flex:1">${esc(o.desc)}</div></div>`).join(""):`<span class="mut">Sem ocorrências registadas.</span>`}</div>`)}
   ${sec("Mensagens","#e0873a",`<div class="box acc" style="--a:#e0873a">${txt(r.mensagens)}</div>`)}
   ${sec("Troca de turno","#6b7280",`<div class="cols">${sig(r.cessante,"Chefe cessante")}${sig(r.seguinte,"Chefe seguinte")}</div>`)}
-  ${sec("Visto do Comandante","#1f2328",`<div class="cols">${sig({...r.comandante,obs:""},"Comandante")}<div class="box"><div class="k">Observações</div>${txt(r.comandante.obs)}</div></div>`)}
+  ${sec("Visto Comandante","#1f2328",`<div class="cols">${sig({...r.comandante,obs:""},"Comandante")}<div class="box"><div class="k">Observações</div>${txt(r.comandante.obs)}</div></div>`)}
   <div class="foot">${r.fechado?"Relatório fechado em "+new Date(r.fechado).toLocaleString("pt-PT",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})+" · ":"Relatório em aberto · "}Documento gerado em ${agora}</div>`;
 }
 $("#bPrint").onclick=()=>{ buildSheet(R); try{ window.print(); }catch(e){ toast("A impressão não está disponível aqui — use o PDF."); } };
@@ -587,30 +589,73 @@ async function saveFile(filename, data, mime){
   if(DL){ try{ await DL.save({filename, data}); return; }catch(e){ if(e?.code==="declined") return; } }
   const url=URL.createObjectURL(data instanceof Blob?data:new Blob([data],{type:mime})); const a=document.createElement("a"); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000);
 }
+const pdfName = r => `Relatorio_Turno_${(r.turno||"").replace(/\W+/g,"")}_${r.data||""}.pdf`;
+async function makePdf(){
+  buildSheet(R); await new Promise(z=>setTimeout(z,80));
+  const sh=$("#sheet"), SC=2;
+  const top0=sh.getBoundingClientRect().top;
+  const cuts=[...sh.querySelectorAll(":scope > .blk, :scope > .info, :scope > .hd, :scope > .foot")].map(e=>Math.round((e.getBoundingClientRect().bottom-top0)*SC));
+  const canvas=await html2canvas(sh,{scale:SC,backgroundColor:"#ffffff"});
+  const pdf=new jspdf.jsPDF({unit:"mm",format:"a4"}); const W=210,H=297, M=10;
+  const pxPerMm=canvas.width/W; let y=0, pages=[];
+  while(y<canvas.height-2){
+    const topM = pages.length?M:0, avail=Math.floor((H-topM-M-4)*pxPerMm);
+    let end=Math.min(y+avail,canvas.height);
+    if(end<canvas.height){ const ok=cuts.filter(c=>c>y+40&&c<=end); if(ok.length) end=ok.at(-1); }
+    pages.push([y,end,topM]); y=end;
+  }
+  pages.forEach(([a,e,topM],i)=>{ const c=document.createElement("canvas"); c.width=canvas.width; c.height=e-a;
+    c.getContext("2d").drawImage(canvas,0,a,canvas.width,e-a,0,0,canvas.width,e-a);
+    if(i) pdf.addPage(); pdf.addImage(c.toDataURL("image/jpeg",0.93),"JPEG",0,topM,W,(e-a)/pxPerMm);
+    pdf.setFontSize(8); pdf.setTextColor(150); pdf.text(`Relatório de Turno · ${fmtD(R.data)} · ${R.turno||""}`,14,H-6); pdf.text(`Página ${i+1} de ${pages.length}`,W-14,H-6,{align:"right"}); });
+  return pdf.output("blob");
+}
 $("#bPdf").onclick=async()=>{
   if(!window.html2canvas||!window.jspdf) return toast("Gerador de PDF indisponível — use Imprimir.");
   const b=$("#bPdf"); b.disabled=true; b.textContent="A gerar…";
-  try{
-    buildSheet(R); await new Promise(z=>setTimeout(z,80));
-    const sh=$("#sheet"), SC=2;
-    const top0=sh.getBoundingClientRect().top;
-    const cuts=[...sh.querySelectorAll(":scope > .blk, :scope > .info, :scope > .hd, :scope > .foot")].map(e=>Math.round((e.getBoundingClientRect().bottom-top0)*SC));
-    const canvas=await html2canvas(sh,{scale:SC,backgroundColor:"#ffffff"});
-    const pdf=new jspdf.jsPDF({unit:"mm",format:"a4"}); const W=210,H=297, M=10;
-    const pxPerMm=canvas.width/W; let y=0, pages=[];
-    while(y<canvas.height-2){
-      const topM = pages.length?M:0, avail=Math.floor((H-topM-M-4)*pxPerMm);
-      let end=Math.min(y+avail,canvas.height);
-      if(end<canvas.height){ const ok=cuts.filter(c=>c>y+40&&c<=end); if(ok.length) end=ok.at(-1); }
-      pages.push([y,end,topM]); y=end;
-    }
-    pages.forEach(([a,e,topM],i)=>{ const c=document.createElement("canvas"); c.width=canvas.width; c.height=e-a;
-      c.getContext("2d").drawImage(canvas,0,a,canvas.width,e-a,0,0,canvas.width,e-a);
-      if(i) pdf.addPage(); pdf.addImage(c.toDataURL("image/jpeg",0.93),"JPEG",0,topM,W,(e-a)/pxPerMm);
-      pdf.setFontSize(8); pdf.setTextColor(150); pdf.text(`Relatório de Turno · ${fmtD(R.data)} · ${R.turno||""}`,14,H-6); pdf.text(`Página ${i+1} de ${pages.length}`,W-14,H-6,{align:"right"}); });
-    await saveFile(`Relatorio_Turno_${(R.turno||"").replace(/\W+/g,"")}_${R.data||""}.pdf`, pdf.output("blob"), "application/pdf");
-  }catch(e){ console.error(e); toast("Não foi possível gerar o PDF."); }
+  try{ await saveFile(pdfName(R), await makePdf(), "application/pdf"); }
+  catch(e){ console.error(e); toast("Não foi possível gerar o PDF."); }
   b.disabled=false; b.textContent="PDF";
+};
+
+/* email */
+function mailText(r){
+  const L=a=>a&&a.length?a.join(", "):"—", T=v=>v&&String(v).trim()?String(v).trim():"—";
+  const tr=(r.trocas||[]).filter(t=>t.a||t.b).map(t=>`${t.a||"?"} ⇄ ${t.b||"?"}`);
+  const oc=(r.ocorrencias||[]).filter(o=>o.hora||o.desc).map(o=>`  ${o.hora||""} ${o.desc||""}`.trimEnd());
+  const subject=`Relatório de Turno — ${fmtD(r.data)} — Turno ${r.turno||""}`;
+  const body=[`Segue o Relatório de Turno de ${fmtD(r.data)}.`,"",
+    `Turno/Piquete: ${T(r.turno)}`,`Chefe: ${T(r.chefe)}`,"",
+    `Presenças: ${L(r.presencas)}`,`Faltas justificadas: ${L(r.faltasJ)}`,`Faltas injustificadas: ${L(r.faltasI)}`,`Trocas de serviço: ${L(tr)}`,"",
+    `Instrução: ${T(r.instrucao)}`,`Atividades: ${T(r.atividades)}`,"",
+    `Inoperacionais: ${T(r.inoperacionais)}`,`Anomalias: ${T(r.anomalias)}`,`Combustível (inferior a ½): ${T(r.combustivel)}`,"",
+    `Ocorrências de serviço:`, ...(oc.length?oc:["  —"]),"",
+    `Mensagens:`, T(r.mensagens),"",
+    `Chefe cessante: ${T(r.cessante?.nome)}`,`Chefe seguinte: ${T(r.seguinte?.nome)}`,`Visto Comandante: ${T(r.comandante?.nome)}`].join("\n");
+  return {subject, body};
+}
+function openMail(to, subject, body){
+  const a=document.createElement("a");
+  a.href=`mailto:${encodeURIComponent(to||"").replace(/%2C/gi,",")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  a.target="_top"; document.body.appendChild(a); a.click(); a.remove();
+}
+$("#bMail").onclick=async()=>{
+  const b=$("#bMail"); b.disabled=true; b.textContent="A preparar…";
+  const {subject, body}=mailText(R), to=(settings.emailPara||"").trim();
+  try{
+    let blob=null;
+    if(window.html2canvas&&window.jspdf){ try{ blob=await makePdf(); }catch(e){ console.error(e); } }
+    if(blob && navigator.canShare){
+      const file=new File([blob], pdfName(R), {type:"application/pdf"});
+      if(navigator.canShare({files:[file]})){
+        try{ await navigator.share({files:[file], title:subject, text:body}); b.disabled=false; b.textContent="Email"; return; }
+        catch(e){ if(e?.name==="AbortError"){ b.disabled=false; b.textContent="Email"; return; } }
+      }
+    }
+    if(blob){ await saveFile(pdfName(R), blob, "application/pdf"); toast("PDF descarregado — anexe-o ao email."); }
+    openMail(to, subject, body+(blob?"\n\n(Relatório em PDF em anexo.)":""));
+  }catch(e){ console.error(e); toast("Não foi possível preparar o email."); }
+  b.disabled=false; b.textContent="Email";
 };
 
 /* exportar / importar */
